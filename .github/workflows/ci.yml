@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        java: ["17", "21"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
+        if: runner.os == 'Linux'
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Test and build the CLI
+        run: ./gradlew --no-daemon test installDist
+      - name: Run the CLI on the example scans
+        run: |
+          set +e
+          build/install/gs1-parse/bin/gs1-parse --today 2026-11-21 < examples/receiving-dock-scans.txt > out.txt
+          code=$?
+          set -e
+          cat out.txt
+          test "$code" -eq 1
+          grep -q "(3103) NET WEIGHT (kg): 4.125 kg" out.txt
