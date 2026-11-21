@@ -14,7 +14,7 @@ data class Gs1Element(
     val notChecked: List<String> = emptyList(),
 )
 
-/** A problem found in the input. [position] is a 0-based index into the normalized input. */
+/** A problem found in the input. [position] is a 0-based index into the input as given, symbology identifier included. */
 data class Gs1Issue(val position: Int, val ai: String?, val message: String)
 
 data class Gs1Result(
@@ -52,6 +52,7 @@ object Gs1 {
         val warnings = mutableListOf<Gs1Issue>()
 
         var data = input.trimEnd('\r', '\n')
+        var prefix = 0
         if (data.startsWith("]")) {
             val id = data.take(3)
             if (id !in GS1_SYMBOLOGY_IDS) {
@@ -59,6 +60,7 @@ object Gs1 {
                 return Gs1Result(emptyList(), errors, warnings)
             }
             data = data.substring(3)
+            prefix = 3
         }
         if (data.isEmpty()) {
             errors += Gs1Issue(0, null, "no data")
@@ -74,7 +76,8 @@ object Gs1 {
 
         val elements = pieces.map { validate(it, options.today, errors) }
         checkDuplicates(pieces, errors)
-        return Gs1Result(elements, errors, warnings)
+        if (prefix == 0) return Gs1Result(elements, errors, warnings)
+        return Gs1Result(elements, errors.map { it.copy(position = it.position + prefix) }, warnings.map { it.copy(position = it.position + prefix) })
     }
 
     private class Piece(val position: Int, val def: AiDefinition, val raw: String)

@@ -49,6 +49,13 @@ class ParserTest {
     }
 
     @Test
+    fun `positions count the symbology identifier`() {
+        val r = parse("]C10109506000134353")
+        assertEquals(5, r.errors.single().position)
+        assertEquals(2, parse("0109506000134353").errors.single().position)
+    }
+
+    @Test
     fun `SSCC on a pallet label`() {
         val r = parse("]C100106141411234567897")
         assertTrue(r.isValid, r.errors.toString())
