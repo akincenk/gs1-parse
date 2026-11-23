@@ -12,7 +12,8 @@ the number in front is the issue number. Estimates are rough.
 2. **Warn about a probable missing separator (2 h).** When a variable-length value ends with
    digits that would parse as one or more valid elements (`10AB1215270115` = batch `AB12` +
    best-before 2027-01-15), add a warning that names the AIs it may contain. Found while testing
-   the receiving dock example.
+   the receiving dock example. **Done:** only when the first swallowed AI has a date or check
+   digit test; random batch numbers matched (20) and (31nn) too often without that rule.
 3. **Hint for substitute separator characters (1 h).** Some keyboard-wedge scanners send `^`,
    `~` or a text marker like `{GS}` instead of ASCII 29. When a character-set error hits one of
    these, say so in the message, and let `ParseOptions` take a multi-character marker.
