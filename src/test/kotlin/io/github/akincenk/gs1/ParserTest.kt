@@ -207,4 +207,41 @@ class ParserTest {
         assertEquals("no data", parse("").errors.single().message)
         assertEquals("no data", parse("]d2").errors.single().message)
     }
+
+    @Test
+    fun `lost separator after a batch is a warning, the data stays as scanned`() {
+        val r = parse("]C10109506000134352" + "10AB12" + "15270115")
+        assertTrue(r.isValid, r.errors.toString())
+        assertEquals("AB1215270115", r["10"]?.raw)
+        val w = r.warnings.single()
+        assertEquals("(10) may contain (15) 270115; was a separator lost?", w.message)
+        assertEquals("10", w.ai)
+        assertEquals(25, w.position)
+    }
+
+    @Test
+    fun `lost separator before several fixed-length elements lists all of them`() {
+        val r = parse("]d201095060001340172" + "1SN000183" + "17280531" + "15280430")
+        assertEquals(
+            "(21) may contain (17) 280531 (15) 280430; was a separator lost?",
+            r.warnings.single().message,
+        )
+    }
+
+    @Test
+    fun `no swallowed-AI warning for ordinary values`() {
+        // Too short to hold an AI plus data.
+        assertTrue(parse("0109506000134352" + "101234").warnings.isEmpty())
+        // Tail would be (15) with month 99, which is not a date.
+        assertTrue(parse("0109506000134352" + "10AB1215279915").warnings.isEmpty())
+        // Tail starts with a variable-length AI (21); too ambiguous to report.
+        assertTrue(parse("0109506000134352" + "10AB21XYZ").warnings.isEmpty())
+        // Tails that start with an AI without a date or check digit test, here (20) and (3103).
+        assertTrue(parse("0109506000134352" + "10AB2057").warnings.isEmpty())
+        assertTrue(parse("0109506000134352" + "10AB3103001250").warnings.isEmpty())
+        // Separator present: nothing swallowed.
+        assertTrue(parse("0109506000134352" + "10AB12" + gs + "15270115").warnings.isEmpty())
+        // Bracketed form has explicit boundaries.
+        assertTrue(parse("(01)09506000134352(10)AB1215270115").warnings.isEmpty())
+    }
 }
