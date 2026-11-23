@@ -53,7 +53,10 @@ See [ROADMAP.md](ROADMAP.md).
 
 One limit no parser can fix: when a scanner drops the separator after a variable-length field,
 the next AI becomes part of that field. `10AB12` followed by `15270115` without GS reads as batch
-`AB1215270115`. Issue #2 adds a warning for values that look like this.
+`AB1215270115`. The data is still valid, so it is kept as scanned, but a warning says
+`(10) may contain (15) 270115; was a separator lost?`. The warning only fires when the end of the
+value parses as complete elements and the first of them passes a date or check digit test, so
+a lost separator before (21), (20) or a measure such as (3103) is not reported.
 
 ## Stack
 

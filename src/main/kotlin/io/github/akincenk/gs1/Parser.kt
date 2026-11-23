@@ -71,7 +71,7 @@ object Gs1 {
             splitBracketed(data, options.dictionary, errors)
         } else {
             if (options.separator != GS) data = data.replace(options.separator, GS)
-            splitRaw(data, options.dictionary, errors, warnings)
+            splitRaw(data, options.dictionary, errors, warnings).also { warnSwallowed(it, options, warnings) }
         }
 
         val elements = pieces.map { validate(it, options.today, errors) }
@@ -126,6 +126,35 @@ object Gs1 {
         }
         return pieces
     }
+
+    /**
+     * A scanner that drops the separator after a variable-length value glues the next element onto it,
+     * e.g. batch "AB12" + best-before "15270115" becomes batch "AB1215270115". The data is still valid,
+     * so this only warns when some tail of the value parses on its own as complete, valid elements and
+     * the first of them passed a date or check digit test.
+     * shortcut: tails that start with a variable-length AI (e.g. "21...") or an unchecked fixed one
+     * (e.g. "20", "3103") are skipped, because random batch text matches them too often (about 1 in 40
+     * in a test with random batches); a lost separator before such an AI is not reported.
+     */
+    private fun warnSwallowed(pieces: List<Piece>, options: ParseOptions, warnings: MutableList<Gs1Issue>) {
+        for (piece in pieces) {
+            if (piece.def.fixedLength != null) continue
+            for (k in 1 until piece.raw.length) {
+                val tail = piece.raw.substring(k)
+                val next = options.dictionary.matchAt(tail, 0) ?: continue
+                if (next.fixedLength == null || next.components.none { c -> c.linters.any { it in STRONG_CHECKS } }) continue
+                val errors = mutableListOf<Gs1Issue>()
+                val found = splitRaw(tail, options.dictionary, errors, mutableListOf())
+                val elements = found.map { validate(it, options.today, errors) }
+                if (errors.isNotEmpty()) continue
+                val shown = elements.joinToString(" ") { "(${it.ai}) ${it.raw}" }
+                warnings += Gs1Issue(piece.position + k, piece.def.ai, "(${piece.def.ai}) may contain $shown; was a separator lost?")
+                break
+            }
+        }
+    }
+
+    private val STRONG_CHECKS = setOf("csum", "yymmd0", "yymmdd", "yyyymmdd")
 
     private fun splitBracketed(data: String, dict: Gs1Dictionary, errors: MutableList<Gs1Issue>): List<Piece> {
         val pieces = mutableListOf<Piece>()
