@@ -44,7 +44,7 @@ data class AiDefinition(
     /** True when the AI is in the predefined-length table and needs no FNC1 separator after it. */
     val predefinedLength: Boolean,
     val components: List<Component>,
-    /** Raw attributes such as `req=01,02` or `dlpkey`. Not evaluated yet. */
+    /** Raw attributes such as `req=01,02` or `dlpkey`. `req=` and `ex=` are checked by [Gs1.parse]. */
     val attributes: List<String>,
 ) {
     /** Total data length when every component is mandatory and fixed, otherwise null. */

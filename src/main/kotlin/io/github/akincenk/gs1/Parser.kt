@@ -34,6 +34,11 @@ data class ParseOptions(
     /** Character the scanner sends for FNC1. Most send ASCII 29 (GS). */
     val separator: Char = Gs1.GS,
     val dictionary: Gs1Dictionary = Gs1Dictionary.bundled,
+    /**
+     * Check the dictionary's AI pairings (`req=`, `ex=`), e.g. (02) needs (37). GS1 applies them to all
+     * barcodes on an item together, so turn this off when a scan is only one of several on the item.
+     */
+    val checkAssociations: Boolean = true,
 )
 
 object Gs1 {
@@ -76,6 +81,8 @@ object Gs1 {
 
         val elements = pieces.map { validate(it, options.today, errors) }
         checkDuplicates(pieces, errors)
+        // Pairings only make sense when every element was read; a broken scan already has its error.
+        if (options.checkAssociations && errors.isEmpty()) checkAssociations(pieces, errors)
         if (prefix == 0) return Gs1Result(elements, errors, warnings)
         return Gs1Result(elements, errors.map { it.copy(position = it.position + prefix) }, warnings.map { it.copy(position = it.position + prefix) })
     }
@@ -238,6 +245,42 @@ object Gs1 {
         pieces.groupBy { it.def.ai }.forEach { (ai, same) ->
             if (same.map { it.raw }.distinct().size > 1) {
                 errors += Gs1Issue(same[1].position, ai, "($ai) appears more than once with different values")
+            }
+        }
+    }
+
+    /**
+     * Evaluates `req=` and `ex=` attributes as the GS1 Syntax Dictionary defines them: `req=01+21,02` is
+     * satisfied by (01) together with (21), or by (02); `ex=01,394n` forbids (01) and any (394n).
+     * Each `req=` attribute must hold on its own. `n` in a pattern matches one digit, and an AI never
+     * matches itself, so (3940) with ex=394n only conflicts with another (394n).
+     */
+    private fun checkAssociations(pieces: List<Piece>, errors: MutableList<Gs1Issue>) {
+        val present = pieces.map { it.def.ai }.distinct()
+        fun found(pattern: String, self: String) = present.firstOrNull { ai ->
+            ai != self && ai.length == pattern.length &&
+                pattern.indices.all { pattern[it] == ai[it] || (pattern[it] == 'n' && ai[it].isDigit()) }
+        }
+        val reportedPairs = mutableSetOf<Set<String>>()
+        for (piece in pieces.distinctBy { it.def.ai }) {
+            val ai = piece.def.ai
+            for (attr in piece.def.attributes) {
+                val list = attr.substringAfter('=').split(',')
+                if (attr.startsWith("req=")) {
+                    val groups = list.map { it.split('+') }
+                    if (groups.none { g -> g.all { found(it, ai) != null } }) {
+                        val shown = groups.map { g -> g.joinToString("+") { "($it)" } }
+                        val needs = if (shown.size == 1) shown[0] else "one of " + shown.joinToString(", ")
+                        errors += Gs1Issue(piece.position, ai, "($ai) needs $needs in the same data")
+                    }
+                } else if (attr.startsWith("ex=")) {
+                    for (pattern in list) {
+                        val other = found(pattern, ai) ?: continue
+                        if (reportedPairs.add(setOf(ai, other))) {
+                            errors += Gs1Issue(piece.position, ai, "($ai) must not appear together with ($other)")
+                        }
+                    }
+                }
             }
         }
     }
