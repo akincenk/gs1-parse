@@ -104,9 +104,9 @@ class ParserTest {
 
     @Test
     fun `impossible dates are errors`() {
-        assertEquals("(17) month 13 is not 01-12", parse("17261301").errors.single().message)
-        assertEquals("(17) day 30 is past the end of month 2", parse("17270230").errors.single().message)
-        assertTrue(parse("17280229").isValid)
+        assertEquals("(17) month 13 is not 01-12", parse("0109506000134352" + "17261301").errors.single().message)
+        assertEquals("(17) day 30 is past the end of month 2", parse("0109506000134352" + "17270230").errors.single().message)
+        assertTrue(parse("0109506000134352" + "17280229").isValid)
     }
 
     @Test
@@ -178,9 +178,9 @@ class ParserTest {
 
     @Test
     fun `same AI twice with different values`() {
-        val r = parse("(10)A(10)B")
+        val r = parse("(01)09506000134352(10)A(10)B")
         assertEquals("(10) appears more than once with different values", r.errors.single().message)
-        assertTrue(parse("(10)A(10)A").isValid)
+        assertTrue(parse("(01)09506000134352(10)A(10)A").isValid)
     }
 
     @Test
@@ -191,7 +191,7 @@ class ParserTest {
 
     @Test
     fun `scanner that sends another separator character`() {
-        val r = Gs1.parse("10AB12|17261231", opts.copy(separator = '|'))
+        val r = Gs1.parse("010950600013435210AB12|17261231", opts.copy(separator = '|'))
         assertTrue(r.isValid, r.errors.toString())
         assertEquals("AB12", r["10"]?.raw)
     }
@@ -243,5 +243,70 @@ class ParserTest {
         assertTrue(parse("0109506000134352" + "10AB12" + gs + "15270115").warnings.isEmpty())
         // Bracketed form has explicit boundaries.
         assertTrue(parse("(01)09506000134352(10)AB1215270115").warnings.isEmpty())
+    }
+
+    @Test
+    fun `required pairing is an error when missing`() {
+        val r = parse("(02)10614141000453(15)270115")
+        assertEquals("(02) needs (37) in the same data", r.errors.single().message)
+        assertEquals("02", r.errors.single().ai)
+        assertTrue(parse("(00)106141410000000019(02)10614141000453(37)24").isValid)
+    }
+
+    @Test
+    fun `required pairing with alternatives and combined groups`() {
+        // (37) req=00+02,00+8026: (02) alone is not enough, it needs (00) as well.
+        val r = parse("(02)10614141000453(37)24")
+        assertEquals("(37) needs one of (00)+(02), (00)+(8026) in the same data", r.errors.single().message)
+        // (250) req=01+21,03+21,8006+21
+        assertEquals(
+            "(250) needs one of (01)+(21), (03)+(21), (8006)+(21) in the same data",
+            parse("(01)09506000134352(250)ABC").errors.single().message,
+        )
+        assertTrue(parse("(01)09506000134352(21)X1(250)ABC").isValid)
+    }
+
+    @Test
+    fun `wildcard patterns match any digit`() {
+        // (3922) price: req=01+30,01+31nn,01+32nn,01+35nn,01+36nn.
+        val price = "(01)09506000134352(3922)1999"
+        assertEquals(
+            "(3922) needs one of (01)+(30), (01)+(31nn), (01)+(32nn), (01)+(35nn), (01)+(36nn) in the same data",
+            parse(price).errors.single().message,
+        )
+        assertTrue(parse("$price(3103)001250").isValid)
+        assertTrue(parse("$price(3650)001250").isValid)
+    }
+
+    @Test
+    fun `invalid pairing is reported once per pair`() {
+        // (01) ex=255,37 and (02) ex=01,03.
+        val r = parse("(01)09506000134352(02)10614141000453(37)24(00)106141410000000019")
+        assertEquals(
+            listOf("(01) must not appear together with (37)", "(02) must not appear together with (01)"),
+            r.errors.map { it.message },
+        )
+    }
+
+    @Test
+    fun `an AI does not exclude itself through its own pattern`() {
+        // (3940) req=255 ex=394n,8111: the same AI twice is fine, another (394n) is not.
+        assertTrue(parse("(255)5412345000150(3940)1234(3940)1234").isValid)
+        assertEquals(
+            "(3940) must not appear together with (3941)",
+            parse("(255)5412345000150(3940)1234(3941)1234").errors.single().message,
+        )
+    }
+
+    @Test
+    fun `pairings can be turned off`() {
+        val noPairs = opts.copy(checkAssociations = false)
+        assertTrue(Gs1.parse("(02)10614141000453", noPairs).isValid)
+        assertTrue(Gs1.parse("(01)09506000134352(02)10614141000453", noPairs).isValid)
+    }
+
+    @Test
+    fun `pairings are not checked when the scan already has an error`() {
+        assertEquals("(17) month 13 is not 01-12", parse("17261301").errors.single().message)
     }
 }

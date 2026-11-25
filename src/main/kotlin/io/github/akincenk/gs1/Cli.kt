@@ -16,6 +16,9 @@ Options:
   --json         print one JSON object per scan
   --sep C        treat character C as the separator, for scanners that do not send GS
   --today DATE   reference date (YYYY-MM-DD) for two-digit years, default today
+  --no-associations
+                 skip AI pairing rules such as "(02) needs (37)"; use when a scan
+                 is only one of several barcodes on the same item
   -h, --help     show this help
 
 Exit status: 0 all scans valid, 1 at least one scan invalid, 2 usage error.
@@ -39,6 +42,7 @@ fun runCli(args: List<String>, stdin: Sequence<String>, out: PrintStream, err: P
                 return 0
             }
             "--json" -> json = true
+            "--no-associations" -> options = options.copy(checkAssociations = false)
             "--sep", "--today" -> {
                 val v = args.getOrNull(++i) ?: return usage(err, "$a needs a value")
                 if (a == "--sep") {
