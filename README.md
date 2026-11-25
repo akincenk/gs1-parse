@@ -38,6 +38,10 @@ It also helps when you are debugging a scanner setup: the CLI shows exactly wher
 - Checks: GS1 mod-10 check digits, dates (`YYMMDD`, day `00` where allowed), times, ISO 4217
   currency codes, ISO 3166 alpha-2 country codes, yes/no and non-zero flags, maximum lengths,
   character sets 82 and 39, the same AI twice with different values.
+- Checks the pairing rules from the dictionary: (02) needs (37), (10) needs a GTIN, (01) must
+  not appear with (02), and so on. GS1 applies these to all barcodes on an item together, so
+  when you parse one barcode of several, turn them off with `ParseOptions(checkAssociations = false)`
+  or `--no-associations`.
 - Typed values: `Date` (century from the GS1 sliding window rule), `DateTime`, `Decimal` with
   unit for (31nn)-(36nn) measures and (39nn) amounts and prices, `Money` with currency for (391n)
   and (393n), `Count` for (30) and (37), `Text` for everything else.
@@ -48,8 +52,7 @@ It also helps when you are debugging a scanner setup: the CLI shows exactly wher
 Not done yet, and listed per element as `notChecked` so nothing passes silently: ISO 3166
 numeric country codes and the less common linters (`csumalpha`, `pieceoftotal`, `latitude`,
 `iban`, ...). Company prefix position checks (`gcppos1`, `gcppos2`) need GS1's prefix allocation
-data and are skipped. Association rules (for example "(02) needs (37)") are not evaluated yet.
-See [ROADMAP.md](ROADMAP.md).
+data and are skipped. See [ROADMAP.md](ROADMAP.md).
 
 One limit no parser can fix: when a scanner drops the separator after a variable-length field,
 the next AI becomes part of that field. `10AB12` followed by `15270115` without GS reads as batch

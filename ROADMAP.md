@@ -8,7 +8,8 @@ the number in front is the issue number. Estimates are rough.
 1. **Evaluate association rules (3 h).** The dictionary lists `req=` (mandatory pairings, for
    example (02) needs (37)) and `ex=` (invalid pairings, for example (01) with (02)). Parse the
    patterns (`01+21`, `31nn`, `394n`), evaluate them over all elements, report errors. Option to
-   turn it off for callers that combine several barcodes on one item.
+   turn it off for callers that combine several barcodes on one item. **Done:** checked only when
+   the scan has no other error; `--no-associations` in the CLI.
 2. **Warn about a probable missing separator (2 h).** When a variable-length value ends with
    digits that would parse as one or more valid elements (`10AB1215270115` = batch `AB12` +
    best-before 2027-01-15), add a warning that names the AIs it may contain. Found while testing
