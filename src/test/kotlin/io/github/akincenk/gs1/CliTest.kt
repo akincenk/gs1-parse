@@ -44,7 +44,7 @@ class CliTest {
 
     @Test
     fun `json output`() {
-        val r = run("--json", "(01)09506000134352(3912)1241999(422)124")
+        val r = run("--json", "--no-associations", "(01)09506000134352(3912)1241999(422)124")
         assertEquals(0, r.code)
         assertEquals(
             """{"valid":true,"elements":[""" +
@@ -65,9 +65,17 @@ class CliTest {
 
     @Test
     fun `custom separator`() {
-        val r = run("--sep", "|", "10AB|21X")
+        val r = run("--sep", "|", "010950600013435210AB|21X")
         assertEquals(0, r.code)
         assertTrue("(21) SERIAL: X" in r.out)
+    }
+
+    @Test
+    fun `pairing errors and the option to skip them`() {
+        val scan = "]C1" + "0210614141000453" + "15270115"
+        assertEquals(1, run(scan).code)
+        assertTrue("error at 5: (02) needs (37) in the same data" in run(scan).out)
+        assertEquals(0, run("--no-associations", scan).code)
     }
 
     @Test
